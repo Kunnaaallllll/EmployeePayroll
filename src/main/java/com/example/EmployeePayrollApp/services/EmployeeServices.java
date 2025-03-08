@@ -1,6 +1,7 @@
 package com.example.EmployeePayrollApp.services;
 
 import com.example.EmployeePayrollApp.dto.EmployeePayrollIDTO;
+import com.example.EmployeePayrollApp.exception.EmployeeNotFoundException;
 import com.example.EmployeePayrollApp.model.Employee;
 import com.example.EmployeePayrollApp.repositries.EmployeeRepositories;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,10 @@ public class EmployeeServices implements EmployeeServiceInterface {
     public List<Employee> getAllEmployees() {
         logger.info("Fetching all employees...");
         List<Employee> employees = repository.findAll();
+        if (employees.isEmpty()) {
+            logger.warn("No employees found in the database!");
+            throw new EmployeeNotFoundException("No employees available");
+        }
         logger.info("Total employees retrieved: {}", employees.size());
         return employees;
     }
@@ -30,13 +35,9 @@ public class EmployeeServices implements EmployeeServiceInterface {
     public Employee getEmployeeById(Long id) {
         logger.info("Fetching employee with ID: {}", id);
         return repository.findById(id)
-                .map(employee -> {
-                    logger.info("Employee found: {}", employee);
-                    return employee;
-                })
-                .orElseGet(() -> {
-                    logger.warn("Employee with ID {} not found!", id);
-                    return null;
+                .orElseThrow(() -> {
+                    logger.error("Employee with ID {} not found!", id);
+                    return new EmployeeNotFoundException("Employee with ID " + id + " not found");
                 });
     }
 
@@ -57,26 +58,31 @@ public class EmployeeServices implements EmployeeServiceInterface {
     @Override
     public Employee updateEmployee(Long id, EmployeePayrollIDTO emp) {
         logger.info("Updating employee with ID: {}", id);
-        return repository.findById(id)
-                .map(existingEmp -> {
-                    existingEmp.setName(emp.getName());
-                    existingEmp.setSalary(emp.getSalary());
-                    existingEmp.setDepartment(emp.getDepartment());
-                    existingEmp.setEmail(emp.getEmail());
-
-                    Employee updatedEmployee = repository.save(existingEmp);
-                    logger.info("Employee updated successfully: {}", updatedEmployee);
-                    return updatedEmployee;
-                })
-                .orElseGet(() -> {
-                    logger.warn("Employee with ID {} not found, update failed!", id);
-                    return null;
+        Employee existingEmp = repository.findById(id)
+                .orElseThrow(() -> {
+                    logger.error("Employee with ID {} not found, update failed!", id);
+                    return new EmployeeNotFoundException("Employee with ID " + id + " not found");
                 });
+
+        existingEmp.setName(emp.getName());
+        existingEmp.setSalary(emp.getSalary());
+        existingEmp.setDepartment(emp.getDepartment());
+        existingEmp.setEmail(emp.getEmail());
+
+        Employee updatedEmployee = repository.save(existingEmp);
+        logger.info("Employee updated successfully: {}", updatedEmployee);
+        return updatedEmployee;
     }
 
     @Override
     public void deleteEmployee(Long id) {
         logger.warn("Deleting employee with ID: {}", id);
+        Employee employee = repository.findById(id)
+                .orElseThrow(() -> {
+                    logger.error("Employee with ID {} not found, delete failed!", id);
+                    return new EmployeeNotFoundException("Employee with ID " + id + " not found");
+                });
+
         repository.deleteById(id);
         logger.info("Employee with ID {} deleted successfully", id);
     }

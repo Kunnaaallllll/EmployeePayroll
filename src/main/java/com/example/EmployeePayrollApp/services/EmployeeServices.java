@@ -7,54 +7,77 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.List;
 
 @Service
 public class EmployeeServices implements EmployeeServiceInterface {
 
-    private static final Logger log = LoggerFactory.getLogger(EmployeeServices.class);
+    private static final Logger logger = LoggerFactory.getLogger(EmployeeServices.class);
 
     @Autowired
     private EmployeeRepositories repository;
 
     @Override
     public List<Employee> getAllEmployees() {
-        log.info("Fetching all employees");
-        return repository.findAll();
+        logger.info("Fetching all employees...");
+        List<Employee> employees = repository.findAll();
+        logger.info("Total employees retrieved: {}", employees.size());
+        return employees;
     }
 
     @Override
     public Employee getEmployeeById(Long id) {
-        log.info("Fetching employee with ID: {}", id);
-        return repository.findById(id).orElse(null);
+        logger.info("Fetching employee with ID: {}", id);
+        return repository.findById(id)
+                .map(employee -> {
+                    logger.info("Employee found: {}", employee);
+                    return employee;
+                })
+                .orElseGet(() -> {
+                    logger.warn("Employee with ID {} not found!", id);
+                    return null;
+                });
     }
 
     @Override
     public Employee addEmployee(EmployeePayrollIDTO emp) {
-        log.info("Adding new employee: {}", emp.getName());
+        logger.info("Adding new employee: {}", emp);
         Employee employee = new Employee();
         employee.setName(emp.getName());
-        employee.setDepartment(emp.getDepartment());
         employee.setEmail(emp.getEmail());
         employee.setSalary(emp.getSalary());
-        return repository.save(employee);
+        employee.setDepartment(emp.getDepartment());
+
+        Employee savedEmployee = repository.save(employee);
+        logger.info("Employee added successfully with ID: {}", savedEmployee.getId());
+        return savedEmployee;
     }
 
     @Override
     public Employee updateEmployee(Long id, EmployeePayrollIDTO emp) {
-        log.info("Updating employee ID: {}", id);
-        Employee existingEmp = repository.findById(id).orElse(null);
-        if (existingEmp != null) {
-            existingEmp.setName(emp.getName());
-            existingEmp.setSalary(emp.getSalary());
-            return repository.save(existingEmp);
-        }
-        return null;
+        logger.info("Updating employee with ID: {}", id);
+        return repository.findById(id)
+                .map(existingEmp -> {
+                    existingEmp.setName(emp.getName());
+                    existingEmp.setSalary(emp.getSalary());
+                    existingEmp.setDepartment(emp.getDepartment());
+                    existingEmp.setEmail(emp.getEmail());
+
+                    Employee updatedEmployee = repository.save(existingEmp);
+                    logger.info("Employee updated successfully: {}", updatedEmployee);
+                    return updatedEmployee;
+                })
+                .orElseGet(() -> {
+                    logger.warn("Employee with ID {} not found, update failed!", id);
+                    return null;
+                });
     }
 
     @Override
     public void deleteEmployee(Long id) {
-        log.info("Deleting employee ID: {}", id);
+        logger.warn("Deleting employee with ID: {}", id);
         repository.deleteById(id);
+        logger.info("Employee with ID {} deleted successfully", id);
     }
 }
